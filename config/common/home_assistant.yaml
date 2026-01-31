@@ -20,7 +20,72 @@ button:
     name: "Factory Reset ESP32 FW"
     entity_category: diagnostic
     internal: true
-  
+
+  # Starts the voice assistant (start listening)
+  - platform: template
+    id: start_voice_assistant_button
+    name: "Start Voice Assistant"
+    icon: "mdi:microphone"
+    entity_category: config
+    on_press:
+      - if:
+          condition:
+            lambda: return !id(init_in_progress);
+          then:
+            - if:
+                condition:
+                  switch.is_on: timer_ringing
+                then:
+                  - switch.turn_off: timer_ringing
+                else:
+                  - if:
+                      condition:
+                        lambda: return id(external_media_player)->state == media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING;
+                      then:
+                        - lambda: |
+                            id(external_media_player)
+                              ->make_call()
+                              .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_STOP)
+                              .set_announcement(true)
+                              .perform();
+                      else:
+                        - if:
+                            condition:
+                              voice_assistant.is_running:
+                            then:
+                              - voice_assistant.stop:
+                            else:
+                              - if:
+                                  condition:
+                                    and:
+                                      - switch.is_off: master_mute_switch
+                                      - not:
+                                          voice_assistant.is_running
+                                  then:
+                                    - if:
+                                        condition:
+                                          switch.is_on: wake_sound
+                                        then:
+                                          - script.execute:
+                                              id: play_sound
+                                              priority: true
+                                              sound_file: !lambda return id(wake_word_triggered_sound);
+                                          - delay: 300ms
+                                    - voice_assistant.start:
+
+  # Stops the voice assistant
+  - platform: template
+    id: stop_voice_assistant_button
+    name: "Stop Voice Assistant"
+    icon: "mdi:microphone-off"
+    entity_category: config
+    on_press:
+      - if:
+          condition:
+            voice_assistant.is_running:
+          then:
+            - voice_assistant.stop:
+
 
 switch:
     # Wake Word Sound Switch.
